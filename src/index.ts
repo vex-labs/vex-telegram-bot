@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 import * as dotenv from "dotenv";
-import { initiateBitteChat } from "./bitte";
+import { bitteChat } from "./bitte";
 
 dotenv.config();
 
@@ -15,7 +15,7 @@ const bot = new Bot(token);
 async function startBot() {
   try {
     // Test chat connection on startup
-    const chatResponse = await initiateBitteChat("Hello");
+    const chatResponse = await bitteChat("Hello");
     console.log('\nBitte Chat Connection Test:');
     console.log(`Status: ${chatResponse.status}`);
     console.log(`Chat ID: ${chatResponse.id}`);
@@ -25,14 +25,14 @@ async function startBot() {
       ctx.reply("Welcome! I'm connected to Bitte AI. Send me a message to start chatting."));
 
     bot.command("status", async (ctx) => {
-      const status = await initiateBitteChat("Check connection");
+      const status = await bitteChat("Check connection");
       await ctx.reply(`Bot Status:\nConnected to Bitte AI\nChat ID: ${status.id}\nStatus: ${status.status}`);
     });
     
     bot.on("message", async (ctx) => {
       if (ctx.message.text) {
         try {
-          const response = await initiateBitteChat(ctx.message.text);
+          const response = await bitteChat(ctx.message.text);
           const aiResponse = response.messages[response.messages.length - 1];
           await ctx.reply(aiResponse?.content || "No response from AI");
         } catch (error) {
