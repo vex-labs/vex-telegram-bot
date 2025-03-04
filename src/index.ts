@@ -20,11 +20,6 @@ interface BitteToolInvocation {
   result: any;
 }
 
-interface BitteThreadHistory {
-  messages: BitteHistoryMessage[];
-  first_message: string;
-}
-
 // Get the bot token from environment variables
 const token = process.env.BOT_TOKEN;
 if (!token) {
@@ -76,8 +71,7 @@ async function startBot() {
       });
 
       console.log(`New chat started - User ID: ${userId}, Username: @${username}, Thread ID: ${threadId}`);
-      ctx.reply("Welcome! I'm connected to Bitte AI. Send me a message to start chatting.");
-      ctx.reply(`Thread ID: ${threadId}`);
+      ctx.reply("Hello there!");
     });
 
     bot.command("status", async (ctx) => {
@@ -92,7 +86,7 @@ async function startBot() {
       
       const status = await bitteChat("Check connection", threadData?.threadId, threadData?.history);
       await ctx.reply(
-        `Bot Status:\nConnected to Bitte AI\nChat ID: ${status.id}\nStatus: ${status.status}\nThread ID: ${threadData?.threadId}`
+        `Bot Status:\nConnected\nChat ID: ${status.id}\nStatus: ${status.status}\nThread ID: ${threadData?.threadId}`
       );
     });
     
