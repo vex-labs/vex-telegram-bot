@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { config } from './config';
 
 export interface BitteMessage {
   role: string;
@@ -67,7 +68,7 @@ export async function bitteChat(message: string, thread_id: string = "1", histor
 
     const response = await axios.post('https://wallet.bitte.ai/api/v1/chat', {
       config: {
-        agentId: "ref-finance-agent.vercel.app"
+        agentId: config.agentId
       },
       id: thread_id,
       messages: messages,

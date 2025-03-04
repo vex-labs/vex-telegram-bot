@@ -4,22 +4,6 @@ import { bitteChat, BitteMessage } from "./bitte";
 
 dotenv.config();
 
-// Types for message history
-interface BitteHistoryMessage {
-  role: string;
-  content: string;
-  tool_invocations?: BitteToolInvocation[];
-  annotations?: any;
-}
-
-interface BitteToolInvocation {
-  state: 'result';
-  tool_call_id: string;
-  tool_name: string;
-  args: any;
-  result: any;
-}
-
 // Get the bot token from environment variables
 const token = process.env.BOT_TOKEN;
 if (!token) {
@@ -43,6 +27,10 @@ function generateThreadId(username?: string): string {
 
 async function startBot() {
   try {
+    console.log('Active threads at startup:', activeThreads.size); // Should show 0
+    // Clear all active threads on startup
+    activeThreads.clear();
+    
     // Test chat connection on startup
     const chatResponse = await bitteChat("Hello", "1");
     console.log('\nBitte Chat Connection Test:');
