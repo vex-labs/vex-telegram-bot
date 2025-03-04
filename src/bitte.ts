@@ -1,13 +1,13 @@
 import axios from 'axios';
 
-interface BitteMessage {
+export interface BitteMessage {
   role: string;
   content: string;
   tool_invocations: any[];
   annotations?: any;
 }
 
-interface BitteChatResponse {
+export interface BitteChatResponse {
   id: string;
   messages: BitteMessage[];
   status: string;
@@ -47,26 +47,30 @@ function parseStreamingResponse(data: string, thread_id: string): BitteChatRespo
   };
 }
 
-export async function bitteChat(message: string, thread_id: string = "1"): Promise<BitteChatResponse> {
+export async function bitteChat(message: string, thread_id: string = "1", history: BitteMessage[] = []): Promise<BitteChatResponse> {
   const API_KEY = process.env.BITTE_API_KEY;
   if (!API_KEY) {
     throw new Error("BITTE_API_KEY environment variable is not set");
   }
 
   try {
+    // Add the new message to the history
+    const messages = [
+      ...history,
+      {
+        role: "user",
+        content: message,
+        tool_invocations: [],
+        annotations: null
+      }
+    ];
+
     const response = await axios.post('https://wallet.bitte.ai/api/v1/chat', {
       config: {
         agentId: "ref-finance-agent.vercel.app"
       },
       id: thread_id,
-      messages: [
-        {
-          role: "user",
-          content: message,
-          tool_invocations: [],
-          annotations: null
-        }
-      ],
+      messages: messages,
     }, {
       headers: { 
         'Authorization': `Bearer ${API_KEY}`,

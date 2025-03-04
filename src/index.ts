@@ -1,8 +1,29 @@
 import { Bot } from "grammy";
 import * as dotenv from "dotenv";
-import { bitteChat } from "./bitte";
+import { bitteChat, BitteMessage } from "./bitte";
 
 dotenv.config();
+
+// Types for message history
+interface BitteHistoryMessage {
+  role: string;
+  content: string;
+  tool_invocations?: BitteToolInvocation[];
+  annotations?: any;
+}
+
+interface BitteToolInvocation {
+  state: 'result';
+  tool_call_id: string;
+  tool_name: string;
+  args: any;
+  result: any;
+}
+
+interface BitteThreadHistory {
+  messages: BitteHistoryMessage[];
+  first_message: string;
+}
 
 // Get the bot token from environment variables
 const token = process.env.BOT_TOKEN;
@@ -12,11 +33,11 @@ if (!token) {
 
 const bot = new Bot(token);
 
-// Define type for Telegram User ID
-type TelegramUserId = number;
-
-// Store active threads by user ID instead of chat ID
-const activeThreads = new Map<TelegramUserId, string>();
+// Store active threads and their history by user ID
+const activeThreads = new Map<number, {
+  threadId: string;
+  history: BitteMessage[];
+}>();
 
 // Generate a thread ID with username prefix
 function generateThreadId(username?: string): string {
@@ -40,16 +61,23 @@ async function startBot() {
         return;
       }
 
-      const userId: TelegramUserId = ctx.from.id;
+      const userId = ctx.from.id;
       const username = ctx.from.username || `user${userId}`;
       const threadId = generateThreadId(username);
       
-      // Store thread ID mapped to user ID
-      activeThreads.set(userId, threadId);
+      // Initialize thread history
+      activeThreads.set(userId, {
+        threadId,
+        history: [{
+          role: "system",
+          content: "Conversation started.",
+          tool_invocations: []
+        }]
+      });
+
       console.log(`New chat started - User ID: ${userId}, Username: @${username}, Thread ID: ${threadId}`);
-      
       ctx.reply("Welcome! I'm connected to Bitte AI. Send me a message to start chatting.");
-      ctx.reply(`Your Thread ID: ${threadId}`);
+      ctx.reply(`Thread ID: ${threadId}`);
     });
 
     bot.command("status", async (ctx) => {
@@ -58,12 +86,14 @@ async function startBot() {
         return;
       }
 
-      const userId: TelegramUserId = ctx.from.id;
-      const threadId = activeThreads.get(userId);
-      console.log(`Status check by User ID: ${userId}, Thread ID: ${threadId}`);
+      const userId = ctx.from.id;
+      const threadData = activeThreads.get(userId);
+      console.log(`Status check by User ID: ${userId}, Thread ID: ${threadData?.threadId}`);
       
-      const status = await bitteChat("Check connection", threadId);
-      await ctx.reply(`Bot Status:\nConnected to Bitte AI\nChat ID: ${status.id}\nStatus: ${status.status}\nYour Thread ID: ${threadId}`);
+      const status = await bitteChat("Check connection", threadData?.threadId, threadData?.history);
+      await ctx.reply(
+        `Bot Status:\nConnected to Bitte AI\nChat ID: ${status.id}\nStatus: ${status.status}\nThread ID: ${threadData?.threadId}`
+      );
     });
     
     bot.on("message", async (ctx) => {
@@ -74,20 +104,47 @@ async function startBot() {
 
       if (ctx.message.text) {
         try {
-          const userId: TelegramUserId = ctx.from.id;
-          let threadId = activeThreads.get(userId);
+          const userId = ctx.from.id;
+          let threadData = activeThreads.get(userId);
           
           // If no thread exists for this user, create one
-          if (!threadId) {
+          if (!threadData) {
             const username = ctx.from.username || `user${userId}`;
-            threadId = generateThreadId(username);
-            activeThreads.set(userId, threadId);
+            const threadId = generateThreadId(username);
+            threadData = {
+              threadId,
+              history: [{
+                role: "system",
+                content: "Conversation started.",
+                tool_invocations: []
+              }]
+            };
+            activeThreads.set(userId, threadData);
             console.log(`New thread created for User ID: ${userId}, Thread ID: ${threadId}`);
           }
+
+          // Get the response with full history
+          const response = await bitteChat(ctx.message.text, threadData.threadId, threadData.history);
           
-          const response = await bitteChat(ctx.message.text, threadId);
-          const aiResponse = response.messages[response.messages.length - 1];
-          await ctx.reply(aiResponse?.content || "No response from AI");
+          // Add user message to history
+          threadData.history.push({
+            role: "user",
+            content: ctx.message.text,
+            tool_invocations: []
+          });
+          
+          // Add AI response to history
+          if (response.messages && response.messages.length > 0) {
+            const aiResponse = response.messages[response.messages.length - 1];
+            threadData.history.push(aiResponse);
+            await ctx.reply(aiResponse.content || "No response from AI");
+          } else {
+            await ctx.reply("No response from AI");
+          }
+
+          // Update the thread data
+          activeThreads.set(userId, threadData);
+          
         } catch (error) {
           await ctx.reply("Sorry, I encountered an error while processing your message.");
         }
