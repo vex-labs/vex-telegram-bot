@@ -59,7 +59,7 @@ async function startBot() {
       });
 
       console.log(`New chat started - User ID: ${userId}, Username: @${username}, Thread ID: ${threadId}`);
-      ctx.reply("Hello there!");
+      ctx.reply("Hello there! I am all that stands between you and becoming a BetVEX Insider Tester. Why would you like to become a tester?");
     });
 
     bot.command("status", async (ctx) => {

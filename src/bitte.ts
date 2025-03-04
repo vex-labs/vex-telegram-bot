@@ -68,7 +68,8 @@ export async function bitteChat(message: string, thread_id: string = "1", histor
 
     const response = await axios.post('https://wallet.bitte.ai/api/v1/chat', {
       config: {
-        agentId: config.agentId
+        agentId: config.agentId,
+        mode: "debug",
       },
       id: thread_id,
       messages: messages,
