@@ -13,7 +13,7 @@ interface BitteChatResponse {
   status: string;
 }
 
-function parseStreamingResponse(data: string): BitteChatResponse {
+function parseStreamingResponse(data: string, thread_id: string): BitteChatResponse {
   const lines = data.split('\n').filter(Boolean);
   let fullMessage = '';
   let metadata = {};
@@ -37,7 +37,7 @@ function parseStreamingResponse(data: string): BitteChatResponse {
   }
 
   return {
-    id: "4321",
+    id: thread_id,
     messages: [{
       role: "assistant",
       content: fullMessage,
@@ -47,7 +47,7 @@ function parseStreamingResponse(data: string): BitteChatResponse {
   };
 }
 
-export async function bitteChat(message: string = "Hello", accountId?: string): Promise<BitteChatResponse> {
+export async function bitteChat(message: string, thread_id: string = "1"): Promise<BitteChatResponse> {
   const API_KEY = process.env.BITTE_API_KEY;
   if (!API_KEY) {
     throw new Error("BITTE_API_KEY environment variable is not set");
@@ -58,7 +58,7 @@ export async function bitteChat(message: string = "Hello", accountId?: string): 
       config: {
         agentId: "ref-finance-agent.vercel.app"
       },
-      id: "4321",
+      id: thread_id,
       messages: [
         {
           role: "user",
@@ -67,7 +67,6 @@ export async function bitteChat(message: string = "Hello", accountId?: string): 
           annotations: null
         }
       ],
-      ...(accountId && { accountId })
     }, {
       headers: { 
         'Authorization': `Bearer ${API_KEY}`,
@@ -76,7 +75,7 @@ export async function bitteChat(message: string = "Hello", accountId?: string): 
       responseType: 'text'
     });
 
-    return parseStreamingResponse(response.data);
+    return parseStreamingResponse(response.data, thread_id);
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
       console.error('Failed to chat:', {

@@ -12,27 +12,80 @@ if (!token) {
 
 const bot = new Bot(token);
 
+// Define type for Telegram User ID
+type TelegramUserId = number;
+
+// Store active threads by user ID instead of chat ID
+const activeThreads = new Map<TelegramUserId, string>();
+
+// Generate a thread ID with username prefix
+function generateThreadId(username?: string): string {
+  const prefix = username || 'user';
+  const randomId = Math.random().toString(36).substring(2, 8);
+  return `${prefix}_${randomId}`;
+}
+
 async function startBot() {
   try {
     // Test chat connection on startup
-    const chatResponse = await bitteChat("Hello");
+    const chatResponse = await bitteChat("Hello", "1");
     console.log('\nBitte Chat Connection Test:');
     console.log(`Status: ${chatResponse.status}`);
     console.log(`Chat ID: ${chatResponse.id}`);
 
     // Bot commands
-    bot.command("start", (ctx) => 
-      ctx.reply("Welcome! I'm connected to Bitte AI. Send me a message to start chatting."));
+    bot.command("start", (ctx) => {
+      if (!ctx.from) {
+        ctx.reply("Error: Could not identify user.");
+        return;
+      }
+
+      const userId: TelegramUserId = ctx.from.id;
+      const username = ctx.from.username || `user${userId}`;
+      const threadId = generateThreadId(username);
+      
+      // Store thread ID mapped to user ID
+      activeThreads.set(userId, threadId);
+      console.log(`New chat started - User ID: ${userId}, Username: @${username}, Thread ID: ${threadId}`);
+      
+      ctx.reply("Welcome! I'm connected to Bitte AI. Send me a message to start chatting.");
+      ctx.reply(`Your Thread ID: ${threadId}`);
+    });
 
     bot.command("status", async (ctx) => {
-      const status = await bitteChat("Check connection");
-      await ctx.reply(`Bot Status:\nConnected to Bitte AI\nChat ID: ${status.id}\nStatus: ${status.status}`);
+      if (!ctx.from) {
+        ctx.reply("Error: Could not identify user.");
+        return;
+      }
+
+      const userId: TelegramUserId = ctx.from.id;
+      const threadId = activeThreads.get(userId);
+      console.log(`Status check by User ID: ${userId}, Thread ID: ${threadId}`);
+      
+      const status = await bitteChat("Check connection", threadId);
+      await ctx.reply(`Bot Status:\nConnected to Bitte AI\nChat ID: ${status.id}\nStatus: ${status.status}\nYour Thread ID: ${threadId}`);
     });
     
     bot.on("message", async (ctx) => {
+      if (!ctx.from) {
+        ctx.reply("Error: Could not identify user.");
+        return;
+      }
+
       if (ctx.message.text) {
         try {
-          const response = await bitteChat(ctx.message.text);
+          const userId: TelegramUserId = ctx.from.id;
+          let threadId = activeThreads.get(userId);
+          
+          // If no thread exists for this user, create one
+          if (!threadId) {
+            const username = ctx.from.username || `user${userId}`;
+            threadId = generateThreadId(username);
+            activeThreads.set(userId, threadId);
+            console.log(`New thread created for User ID: ${userId}, Thread ID: ${threadId}`);
+          }
+          
+          const response = await bitteChat(ctx.message.text, threadId);
           const aiResponse = response.messages[response.messages.length - 1];
           await ctx.reply(aiResponse?.content || "No response from AI");
         } catch (error) {
