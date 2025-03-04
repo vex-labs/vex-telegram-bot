@@ -1,11 +1,20 @@
 {
+	"name": "vex-telegram-bot",
+	"version": "1.0.0",
+	"description": "A Telegram bot to interact with betVEX",
+	"main": "src/index.ts",
+	"scripts": {
+		"start": "ts-node src/index.ts"
+	},
 	"devDependencies": {
 		"@types/dotenv": "^8.2.3",
 		"@types/node": "^22.13.9",
 		"dotenv": "^16.4.7",
+		"ts-node": "^10.9.2",
 		"typescript": "^5.8.2"
 	},
 	"dependencies": {
+		"axios": "^1.8.1",
 		"grammy": "^1.35.0"
 	}
 }
