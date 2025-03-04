@@ -72,6 +72,9 @@ async function startBot() {
       const threadData = activeThreads.get(userId);
       console.log(`Status check by User ID: ${userId}, Thread ID: ${threadData?.threadId}`);
       
+      // Show typing indicator
+      await ctx.api.sendChatAction(ctx.chat.id, "typing");
+      
       const status = await bitteChat("Check connection", threadData?.threadId, threadData?.history);
       await ctx.reply(
         `Bot Status:\nConnected\nChat ID: ${status.id}\nStatus: ${status.status}\nThread ID: ${threadData?.threadId}`
@@ -104,6 +107,9 @@ async function startBot() {
             activeThreads.set(userId, threadData);
             console.log(`New thread created for User ID: ${userId}, Thread ID: ${threadId}`);
           }
+
+          // Show typing indicator
+          await ctx.api.sendChatAction(ctx.chat.id, "typing");
 
           // Get the response with full history
           const response = await bitteChat(ctx.message.text, threadData.threadId, threadData.history);
