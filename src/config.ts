@@ -1,3 +1,3 @@
 export const config = {
-    agentId: "vex-telegram-agent.vercel.app",
+    agentId: "vex-telegram-agent-testing.vercel.app",
 }; 

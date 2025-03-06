@@ -18,6 +18,20 @@ const activeThreads = new Map<number, {
   history: BitteMessage[];
 }>();
 
+// Add this type at the top of the file with other types
+type PendingBet = {
+  matchId: string;
+  team: string;
+  amount: string;
+  accountId: string;
+  teamA: string;
+  teamB: string;
+  date: string;
+};
+
+// Add this map to store pending bets
+const pendingBets = new Map<number, PendingBet>();
+
 // Generate a thread ID with username prefix
 function generateThreadId(username?: string): string {
   const prefix = username || 'user';
@@ -128,22 +142,39 @@ async function startBot() {
     }
 
     const aiResponse = response.messages[response.messages.length - 1].content;
-
+    console.log(`AI response: ${aiResponse}`);
+    
     if (aiResponse.startsWith("Success:")) {
       // Parse success response
       const [_, matchId, team, amount, accountId] = aiResponse.match(/Success: (\S+) (\S+) (\S+) (\S+)/) || [];
       
-      // Log success details to terminal
-      console.log(`Bet placed successfully:
-        Match ID: ${matchId}
-        Team: ${team}
-        Amount: ${amount}
-        Account ID: ${accountId}
-      `);
-
-      await ctx.reply("Your bet has been placed successfully! 🎉");
+      // Parse matchId to get teams and date
+      const matchParts = matchId.split('-');
+      const teamA = matchParts[0].replace(/_/g, ' ');
+      const teamB = matchParts[1].replace(/_/g, ' ');
+      const date = matchParts[2];
+      
+      // Store the pending bet
+      pendingBets.set(ctx.from.id, {
+        matchId,
+        team,
+        amount,
+        accountId,
+        teamA,
+        teamB,
+        date
+      });
+      
+      // Send confirmation message
+      await ctx.reply(
+        `Confirm you want to place the following bet\n` +
+        `Match: ${teamA} vs ${teamB}\n` +
+        `Date: ${date}\n` +
+        `Team: ${team}\n` +
+        `Bet amount: ${amount}\n\n` +
+        `Respond with Yes/No`
+      );
     } else if (aiResponse.startsWith("ERROR:")) {
-      // Forward error message to user
       await ctx.reply(aiResponse);
     } else {
       await ctx.reply("Sorry, I received an unexpected response from the betting system.");
@@ -158,60 +189,89 @@ async function startBot() {
     
     
     bot.on("message", async (ctx) => {
-      if (!ctx.from) {
-        ctx.reply("Error: Could not identify user.");
-        return;
-      }
-      console.log(`Received message: ${ctx.message.text}`);
+      if (!ctx.from || !ctx.message.text) return;
+      
+      const pendingBet = pendingBets.get(ctx.from.id);
+      
+      if (pendingBet) {
+        const response = ctx.message.text.toLowerCase();
+        
+        if (response === 'yes') {
+          await ctx.reply("Placing bet");
+          // Here you would add the code to actually place the bet
+          console.log(`Bet placed successfully:
+            Match ID: ${pendingBet.matchId}
+            Team: ${pendingBet.team}
+            Amount: ${pendingBet.amount}
+            Account ID: ${pendingBet.accountId}
+          `);
+          // Clear the pending bet
+          pendingBets.delete(ctx.from.id);
+        } else if (response === 'no') {
+          await ctx.reply("Cancelling bet");
+          // Clear the pending bet
+          pendingBets.delete(ctx.from.id);
+        } else {
+          await ctx.reply("Please respond Yes/No");
+          return;
+        }
+      } else {
+        // If no pending bet, process as normal message
+        if (!ctx.from) {
+          ctx.reply("Error: Could not identify user.");
+          return;
+        }
+        console.log(`Received message: ${ctx.message.text}`);
 
-      if (ctx.message.text) {
-        try {
-          const userId = ctx.from.id;
-          let threadData = activeThreads.get(userId);
-          
-          // If no thread exists for this user, create one
-          if (!threadData) {
-            const username = ctx.from.username || `user${userId}`;
-            const threadId = generateThreadId(username);
-            threadData = {
-              threadId,
-              history: [{
-                role: "system",
-                content: "Conversation started.",
-                tool_invocations: []
-              }]
-            };
+        if (ctx.message.text) {
+          try {
+            const userId = ctx.from.id;
+            let threadData = activeThreads.get(userId);
+            
+            // If no thread exists for this user, create one
+            if (!threadData) {
+              const username = ctx.from.username || `user${userId}`;
+              const threadId = generateThreadId(username);
+              threadData = {
+                threadId,
+                history: [{
+                  role: "system",
+                  content: "Conversation started.",
+                  tool_invocations: []
+                }]
+              };
+              activeThreads.set(userId, threadData);
+              console.log(`New thread created for User ID: ${userId}, Thread ID: ${threadId}`);
+            }
+
+            // Show typing indicator
+            await ctx.api.sendChatAction(ctx.chat.id, "typing");
+
+            // Get the response with full history
+            const response = await bitteChat(ctx.message.text, threadData.threadId, threadData.history);
+            
+            // Add user message to history
+            threadData.history.push({
+              role: "user",
+              content: ctx.message.text,
+              tool_invocations: []
+            });
+            
+            // Add AI response to history
+            if (response.messages && response.messages.length > 0) {
+              const aiResponse = response.messages[response.messages.length - 1];
+              threadData.history.push(aiResponse);
+              await ctx.reply(aiResponse.content || "No response from AI");
+            } else {
+              await ctx.reply("No response from AI");
+            }
+
+            // Update the thread data
             activeThreads.set(userId, threadData);
-            console.log(`New thread created for User ID: ${userId}, Thread ID: ${threadId}`);
+            
+          } catch (error) {
+            await ctx.reply("Sorry, I encountered an error while processing your message.");
           }
-
-          // Show typing indicator
-          await ctx.api.sendChatAction(ctx.chat.id, "typing");
-
-          // Get the response with full history
-          const response = await bitteChat(ctx.message.text, threadData.threadId, threadData.history);
-          
-          // Add user message to history
-          threadData.history.push({
-            role: "user",
-            content: ctx.message.text,
-            tool_invocations: []
-          });
-          
-          // Add AI response to history
-          if (response.messages && response.messages.length > 0) {
-            const aiResponse = response.messages[response.messages.length - 1];
-            threadData.history.push(aiResponse);
-            await ctx.reply(aiResponse.content || "No response from AI");
-          } else {
-            await ctx.reply("No response from AI");
-          }
-
-          // Update the thread data
-          activeThreads.set(userId, threadData);
-          
-        } catch (error) {
-          await ctx.reply("Sorry, I encountered an error while processing your message.");
         }
       }
     });
