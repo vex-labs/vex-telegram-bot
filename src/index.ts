@@ -1,6 +1,8 @@
 import { Bot } from "grammy";
 import * as dotenv from "dotenv";
 import { bitteChat, BitteMessage } from "./bitte";
+import { formatUsdcAmount } from "./utils";
+import { findUserByTelegramUsername } from './dbInteraction';
 
 dotenv.config();
 
@@ -24,6 +26,7 @@ type PendingBet = {
   team: string;
   amount: string;
   accountId: string;
+  mpcKey: string;
   teamA: string;
   teamB: string;
   date: string;
@@ -103,6 +106,20 @@ async function startBot() {
     return;
   }
 
+  if (!ctx.from.username) {
+    await ctx.reply("You need to set up a Telegram username to use betting features. Please set a username in your Telegram settings and try again.");
+    return;
+  }
+
+  // Check if user is registered using username instead of ID
+  const userData = await findUserByTelegramUsername(ctx.from.username);
+  console.log(`User data for @${ctx.from.username}:`, userData);
+  
+  if (!userData) {
+    await ctx.reply("You are not signed up for telegram betting, you need to register at testnet.betvex.xyz/settings");
+    return;
+  }
+
   console.log(`Received bet command: ${ctx.message?.text}`);
 
   const userId = ctx.from.id;
@@ -129,8 +146,8 @@ async function startBot() {
       }]
     };
 
-    // Add --form-bet to the message
-    const formattedMessage = `${betMessage} --form-bet pivortex.testnet`;
+    // Add --form-bet to the message with the user's account ID
+    const formattedMessage = `${betMessage} --form-bet ${userData.account_id}`;
     console.log(`Formatted message: ${formattedMessage}`);
     
     // Call Bitte AI with the formatted message
@@ -154,24 +171,27 @@ async function startBot() {
       const teamB = matchParts[1].replace(/_/g, ' ');
       const date = matchParts[2];
       
-      // Store the pending bet
+      // Store the pending bet with mpcKey
       pendingBets.set(ctx.from.id, {
         matchId,
         team,
         amount,
-        accountId,
+        accountId: userData.account_id,
+        mpcKey: userData.mpc_key,
         teamA,
         teamB,
         date
       });
       
+      let displayAmount = formatUsdcAmount(amount);
+
       // Send confirmation message
       await ctx.reply(
         `Confirm you want to place the following bet\n` +
         `Match: ${teamA} vs ${teamB}\n` +
         `Date: ${date}\n` +
         `Team: ${team}\n` +
-        `Bet amount: ${amount}\n\n` +
+        `Bet amount: $${displayAmount}\n\n` +
         `Respond with Yes/No`
       );
     } else if (aiResponse.startsWith("ERROR:")) {
