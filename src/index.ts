@@ -80,12 +80,89 @@ async function startBot() {
         `Bot Status:\nConnected\nChat ID: ${status.id}\nStatus: ${status.status}\nThread ID: ${threadData?.threadId}`
       );
     });
+
+    
+ // Add this after your other command handlers
+ bot.command("bet", async (ctx) => {
+  if (!ctx.from) {
+    ctx.reply("Error: Could not identify user.");
+    return;
+  }
+
+  console.log(`Received bet command: ${ctx.message?.text}`);
+
+  const userId = ctx.from.id;
+  const username = ctx.from.username || `user${userId}`;
+  const threadId = generateThreadId(username);
+  
+  const betMessage = ctx.message?.text?.split('/bet')[1]?.trim();
+  
+  if (!betMessage) {
+    await ctx.reply("Please provide bet details after the /bet command.");
+    return;
+  }
+
+  try {
+    await ctx.api.sendChatAction(ctx.chat.id, "typing");
+
+    // Create new thread specifically for betting
+    const threadData = {
+      threadId,
+      history: [{
+        role: "system",
+        content: "You are a betting assistant that helps users place bets. Process the bet request and respond with either a success message in the exact format 'Success: {matchId} {team} {amount} {accountId}' or an error message starting with 'ERROR:'.",
+        tool_invocations: []
+      }]
+    };
+
+    // Add --form-bet to the message
+    const formattedMessage = `${betMessage} --form-bet pivortex.testnet`;
+    console.log(`Formatted message: ${formattedMessage}`);
+    
+    // Call Bitte AI with the formatted message
+    const response = await bitteChat(formattedMessage, threadId, threadData.history);
+    
+    if (!response.messages || response.messages.length === 0) {
+      await ctx.reply("Sorry, I received no response from the betting system.");
+      return;
+    }
+
+    const aiResponse = response.messages[response.messages.length - 1].content;
+
+    if (aiResponse.startsWith("Success:")) {
+      // Parse success response
+      const [_, matchId, team, amount, accountId] = aiResponse.match(/Success: (\S+) (\S+) (\S+) (\S+)/) || [];
+      
+      // Log success details to terminal
+      console.log(`Bet placed successfully:
+        Match ID: ${matchId}
+        Team: ${team}
+        Amount: ${amount}
+        Account ID: ${accountId}
+      `);
+
+      await ctx.reply("Your bet has been placed successfully! 🎉");
+    } else if (aiResponse.startsWith("ERROR:")) {
+      // Forward error message to user
+      await ctx.reply(aiResponse);
+    } else {
+      await ctx.reply("Sorry, I received an unexpected response from the betting system.");
+    }
+
+  } catch (error) {
+    console.error('Error processing bet:', error);
+    await ctx.reply("Sorry, there was an error processing your bet. Please try again.");
+  }
+});
+
+    
     
     bot.on("message", async (ctx) => {
       if (!ctx.from) {
         ctx.reply("Error: Could not identify user.");
         return;
       }
+      console.log(`Received message: ${ctx.message.text}`);
 
       if (ctx.message.text) {
         try {
