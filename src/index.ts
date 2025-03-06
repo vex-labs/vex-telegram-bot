@@ -3,6 +3,7 @@ import * as dotenv from "dotenv";
 import { bitteChat, BitteMessage } from "./bitte";
 import { formatUsdcAmount } from "./utils";
 import { findUserByTelegramUsername } from './dbInteraction';
+import { callProxyBet } from './nearInteraction';
 
 dotenv.config();
 
@@ -217,16 +218,33 @@ async function startBot() {
         const response = ctx.message.text.toLowerCase();
         
         if (response === 'yes') {
-          await ctx.reply("Placing bet");
-          // Here you would add the code to actually place the bet
-          console.log(`Bet placed successfully:
-            Match ID: ${pendingBet.matchId}
-            Team: ${pendingBet.team}
-            Amount: ${pendingBet.amount}
-            Account ID: ${pendingBet.accountId}
-          `);
-          // Clear the pending bet
-          pendingBets.delete(ctx.from.id);
+          await ctx.reply("Placing bet...");
+          try {
+            const result = await callProxyBet(
+              pendingBet.accountId,
+              pendingBet.mpcKey,
+              pendingBet.matchId,
+              pendingBet.team,
+              pendingBet.amount
+            );
+
+            console.log(`Result: ${result}`);
+            
+            console.log(`Bet placed successfully:
+              Match ID: ${pendingBet.matchId}
+              Team: ${pendingBet.team}
+              Amount: ${pendingBet.amount}
+              Account ID: ${pendingBet.accountId}
+              Transaction Result: ${JSON.stringify(result)}
+            `);
+            
+            await ctx.reply("Your bet has been placed successfully! 🎉");
+          } catch (error) {
+            console.error('Error placing bet:', error);
+            await ctx.reply("Sorry, there was an error placing your bet. Please try again.");
+          } finally {
+            pendingBets.delete(ctx.from.id);
+          }
         } else if (response === 'no') {
           await ctx.reply("Cancelling bet");
           // Clear the pending bet
