@@ -90,15 +90,28 @@ export async function callProxyBet(
             attachedDeposit: BigInt(1),
         });
 
+        for (const receipt of outcome.receipts_outcome) {
+            if (!receipt.outcome.status || !(receipt.outcome.status.hasOwnProperty("SuccessValue") || receipt.outcome.status.hasOwnProperty("SuccessReceiptId"))) {
+                console.error("Transaction failed: One or more receipts did not succeed in MPC call");
+                throw new Error("Transaction failed: One or more receipts did not succeed");
+            }
+        }
+
         // Get the signed transaction from the outcome
         const result = providers.getTransactionLastResult(outcome);
-        console.log(result);
         const signedTx = new Uint8Array(result as ArrayBuffer);
 
         // Send the signed transaction
         const send_result = await (near.connection.provider as any).sendJsonRpc("broadcast_tx_commit", [
             Buffer.from(signedTx).toString("base64"),
         ]);
+
+        for (const receipt of send_result.receipts_outcome) {
+            if (!receipt.outcome.status || !(receipt.outcome.status.hasOwnProperty("SuccessValue") || receipt.outcome.status.hasOwnProperty("SuccessReceiptId"))) {
+                console.error("Transaction failed: One or more receipts did not succeed in bet call");
+                throw new Error("Transaction failed: One or more receipts did not succeed");
+            }
+        }
 
         return send_result;
 

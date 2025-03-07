@@ -220,27 +220,25 @@ async function startBot() {
         if (response === 'yes') {
           await ctx.reply("Placing bet...");
           try {
-            const result = await callProxyBet(
+            await callProxyBet(
               pendingBet.accountId,
               pendingBet.mpcKey,
               pendingBet.matchId,
               pendingBet.team,
               pendingBet.amount
             );
-
             
             console.log(`Bet placed successfully:
               Match ID: ${pendingBet.matchId}
               Team: ${pendingBet.team}
               Amount: ${pendingBet.amount}
               Account ID: ${pendingBet.accountId}
-              Transaction Result: ${JSON.stringify(result)}
             `);
             
             await ctx.reply("Your bet has been placed successfully! 🎉 \n You can view your bet at https://testnet.betvex.xyz/user");
           } catch (error) {
             console.error('Error placing bet:', error);
-            await ctx.reply("Sorry, there was an error placing your bet. Please try again.");
+            await ctx.reply("Sorry, there was an error placing your bet. Please contact support.");
           } finally {
             pendingBets.delete(ctx.from.id);
           }
