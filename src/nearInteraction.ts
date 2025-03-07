@@ -92,7 +92,7 @@ export async function callProxyBet(
 
         // Get the signed transaction from the outcome
         const result = providers.getTransactionLastResult(outcome);
-        console.log(`Result: ${result}`);
+        console.log(result);
         const signedTx = new Uint8Array(result as ArrayBuffer);
 
         // Send the signed transaction

@@ -121,14 +121,11 @@ async function startBot() {
     return;
   }
 
-  console.log(`Received bet command: ${ctx.message?.text}`);
-
   const userId = ctx.from.id;
   const username = ctx.from.username || `user${userId}`;
   const threadId = generateThreadId(username);
   
   const betMessage = ctx.message?.text?.split('/bet')[1]?.trim();
-  
   if (!betMessage) {
     await ctx.reply("Please provide bet details after the /bet command.");
     return;
@@ -172,6 +169,9 @@ async function startBot() {
       const teamB = matchParts[1].replace(/_/g, ' ');
       const date = matchParts[2];
       
+      // Convert team enum to actual team name
+      const selectedTeam = team === 'Team1' ? teamA : teamB;
+      
       // Store the pending bet with mpcKey
       pendingBets.set(ctx.from.id, {
         matchId,
@@ -186,12 +186,12 @@ async function startBot() {
       
       let displayAmount = formatUsdcAmount(amount);
 
-      // Send confirmation message
+      // Send confirmation message with actual team name
       await ctx.reply(
         `Confirm you want to place the following bet\n` +
         `Match: ${teamA} vs ${teamB}\n` +
         `Date: ${date}\n` +
-        `Team: ${team}\n` +
+        `Team: ${selectedTeam}\n` +
         `Bet amount: $${displayAmount}\n\n` +
         `Respond with Yes/No`
       );
@@ -228,7 +228,6 @@ async function startBot() {
               pendingBet.amount
             );
 
-            console.log(`Result: ${result}`);
             
             console.log(`Bet placed successfully:
               Match ID: ${pendingBet.matchId}
@@ -238,7 +237,7 @@ async function startBot() {
               Transaction Result: ${JSON.stringify(result)}
             `);
             
-            await ctx.reply("Your bet has been placed successfully! 🎉");
+            await ctx.reply("Your bet has been placed successfully! 🎉 \n You can view your bet at https://testnet.betvex.xyz/user");
           } catch (error) {
             console.error('Error placing bet:', error);
             await ctx.reply("Sorry, there was an error placing your bet. Please try again.");
